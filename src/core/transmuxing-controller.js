@@ -25,7 +25,6 @@ import MP4Remuxer from '../remux/mp4-remuxer.js';
 import DemuxErrors from '../demux/demux-errors.js';
 import IOController from '../io/io-controller.js';
 import TransmuxingEvents from './transmuxing-events.js';
-import {LoaderStatus, LoaderErrors} from '../io/loader.js';
 
 // Transmuxing (IO, Demuxing, Remuxing) controller, with multipart support
 class TransmuxingController {
@@ -38,6 +37,7 @@ class TransmuxingController {
 
         // treat single part media as multipart media, which has only one segment
         if (!mediaDataSource.segments) {
+            console.log('创建segments');
             mediaDataSource.segments = [{
                 duration: mediaDataSource.duration,
                 filesize: mediaDataSource.filesize,
@@ -57,6 +57,7 @@ class TransmuxingController {
         this._currentSegmentIndex = 0;
         let totalDuration = 0;
 
+        console.log(this._mediaDataSource);
         this._mediaDataSource.segments.forEach((segment) => {
             // timestampBase for each segment, and calculate total duration
             segment.timestampBase = totalDuration;
@@ -118,7 +119,9 @@ class TransmuxingController {
     }
 
     start() {
+        // 开始，加载segment
         this._loadSegment(0);
+        // 启动状态汇报定时任务
         this._enableStatisticsReporter();
     }
 
@@ -134,6 +137,7 @@ class TransmuxingController {
         ioctl.onRecoveredEarlyEof = this._onIORecoveredEarlyEof.bind(this);
 
         if (optionalFrom) {
+            // start时，这个没值。
             this._demuxer.bindDataSource(this._ioctl);
         } else {
             ioctl.onDataArrival = this._onInitChunkArrival.bind(this);
@@ -236,14 +240,17 @@ class TransmuxingController {
         let probeData = null;
         let consumed = 0;
 
+        // 第一次收到数据时执行
+        console.log('第一次收到数据：' + data.byteLength + ' ' + byteStart);
         if (byteStart > 0) {
             // IOController seeked immediately after opened, byteStart > 0 callback may received
             this._demuxer.bindDataSource(this._ioctl);
             this._demuxer.timestampBase = this._mediaDataSource.segments[this._currentSegmentIndex].timestampBase;
 
             consumed = this._demuxer.parseChunks(data, byteStart);
-        } else if ((probeData = FLVDemuxer.probe(data)).match) {
+        } else if ((probeData = FLVDemuxer.probe(data)).match) {// 是否flv格式的数据
             // Always create new FLVDemuxer
+            // 创建flv分离器
             this._demuxer = new FLVDemuxer(probeData, this._config);
 
             if (!this._remuxer) {
@@ -263,18 +270,20 @@ class TransmuxingController {
 
             this._demuxer.timestampBase = mds.segments[this._currentSegmentIndex].timestampBase;
 
-            this._demuxer.onError = this._onDemuxException.bind(this);
-            this._demuxer.onMediaInfo = this._onMediaInfo.bind(this);
-            this._demuxer.onMetaDataArrived = this._onMetaDataArrived.bind(this);
-            this._demuxer.onScriptDataArrived = this._onScriptDataArrived.bind(this);
+            this._demuxer.onError = this._onDemuxException.bind(this);// 分离异常绑定
+            this._demuxer.onMediaInfo = this._onMediaInfo.bind(this);// 分离器获取到media信息
+            this._demuxer.onMetaDataArrived = this._onMetaDataArrived.bind(this);// 分离器获取到mediaInfo到达时
+            this._demuxer.onScriptDataArrived = this._onScriptDataArrived.bind(this); // flv 脚本数据到达时
 
-            this._remuxer.bindDataSource(this._demuxer
-                         .bindDataSource(this._ioctl
-            ));
+            // 【重要】_remuxer（复合器（将音频和视频数据合并成ts数据））-->_demuxer（分离器，从flv分理出音频，视频数据）->_ioctl（flv数据提供下载）
+            // 绑定到_demuxer，由_demuxer来绑定_ioctl的onDataArrival，获取数据
+            this._demuxer.bindDataSource(this._ioctl);
+            this._remuxer.bindDataSource(this._demuxer);
 
             this._remuxer.onInitSegment = this._onRemuxerInitSegmentArrival.bind(this);
             this._remuxer.onMediaSegment = this._onRemuxerMediaSegmentArrival.bind(this);
 
+            // 1 当前（第一个包），专递给分离器，2 后续的由分离器自己处理了
             consumed = this._demuxer.parseChunks(data, byteStart);
         } else {
             probeData = null;
@@ -317,6 +326,8 @@ class TransmuxingController {
     }
 
     _onMetaDataArrived(metadata) {
+        console.log("_onMetaDataArrived");
+        console.log(metadata);
         this._emitter.emit(TransmuxingEvents.METADATA_ARRIVED, metadata);
     }
 
@@ -394,7 +405,7 @@ class TransmuxingController {
         if (this._statisticsReporter == null) {
             this._statisticsReporter = self.setInterval(
                 this._reportStatisticsInfo.bind(this),
-            this._config.statisticsInfoReportInterval);
+                this._config.statisticsInfoReportInterval);
         }
     }
 
@@ -430,7 +441,8 @@ class TransmuxingController {
         info.loaderType = this._ioctl.loaderType;
         info.currentSegmentIndex = this._currentSegmentIndex;
         info.totalSegmentCount = this._mediaDataSource.segments.length;
-
+        // console.log('状态汇报：');
+        // console.log(info);
         this._emitter.emit(TransmuxingEvents.STATISTICS_INFO, info);
     }
 

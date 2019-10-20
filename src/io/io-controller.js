@@ -85,6 +85,7 @@ class IOController {
         this._paused = false;
         this._resumeFrom = 0;
 
+        // 暴露出去的事件
         this._onDataArrival = null;
         this._onSeeked = null;
         this._onError = null;
@@ -145,6 +146,8 @@ class IOController {
         this._extraData = data;
     }
 
+    // 【暴露出去的事件】--开始
+
     // prototype: function onDataArrival(chunks: ArrayBuffer, byteStart: number): number
     get onDataArrival() {
         return this._onDataArrival;
@@ -194,6 +197,9 @@ class IOController {
     set onRecoveredEarlyEof(callback) {
         this._onRecoveredEarlyEof = callback;
     }
+
+    // 【暴露出去的事件】--结束
+
 
     get currentURL() {
         return this._dataSource.url;
@@ -327,6 +333,7 @@ class IOController {
     }
 
     seek(bytes) {
+        console.log('tdwu: seek to ' + bytes);
         this._paused = false;
         this._stashUsed = 0;
         this._stashByteStart = 0;
@@ -470,6 +477,7 @@ class IOController {
         }
     }
 
+    //byteStart 为chunk在整个流的开始index
     _onLoaderChunkArrival(chunk, byteStart, receivedLength) {
         if (!this._onDataArrival) {
             throw new IllegalStateException('IOController: No existing consumer (onDataArrival) callback!');
@@ -521,7 +529,7 @@ class IOController {
                     // 从consumed开始开存放
                     stashArray.set(new Uint8Array(chunk, consumed), 0);
                     this._stashUsed += remain;// 有效数据
-                    this._stashByteStart = byteStart + consumed;// 写入的下标计算
+                    this._stashByteStart = byteStart + consumed;// 计算后，供下次_dispatchChunks传入。
                 }
             } else {
                 // 【1.2】暂存区由数据，先合并再转发
