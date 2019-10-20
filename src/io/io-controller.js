@@ -18,15 +18,14 @@
 
 import Log from '../utils/logger.js';
 import SpeedSampler from './speed-sampler.js';
-import {LoaderStatus, LoaderErrors} from './loader.js';
+import {LoaderErrors} from './loader.js';
 import FetchStreamLoader from './fetch-stream-loader.js';
 import MozChunkedLoader from './xhr-moz-chunked-loader.js';
-import MSStreamLoader from './xhr-msstream-loader.js';
 import RangeLoader from './xhr-range-loader.js';
 import WebSocketLoader from './websocket-loader.js';
 import RangeSeekHandler from './range-seek-handler.js';
 import ParamSeekHandler from './param-seek-handler.js';
-import {RuntimeException, IllegalStateException, InvalidArgumentException} from '../utils/exception.js';
+import {IllegalStateException, InvalidArgumentException, RuntimeException} from '../utils/exception.js';
 
 /**
  * DataSource: {
@@ -35,7 +34,7 @@ import {RuntimeException, IllegalStateException, InvalidArgumentException} from 
  *     cors: boolean,
  *     withCredentials: boolean
  * }
- * 
+ *
  */
 
 // Manage IO Loaders
@@ -47,23 +46,24 @@ class IOController {
         this._config = config;
         this._extraData = extraData;
 
+        // 暂存区/缓存区大小，可由外部config 中设置
         this._stashInitialSize = 1024 * 384;  // default initial size: 384KB
         if (config.stashInitialSize != undefined && config.stashInitialSize > 0) {
             // apply from config
             this._stashInitialSize = config.stashInitialSize;
         }
 
-        this._stashUsed = 0;
-        this._stashSize = this._stashInitialSize;
-        this._bufferSize = 1024 * 1024 * 3;  // initial size: 3MB
-        this._stashBuffer = new ArrayBuffer(this._bufferSize);
+        this._stashUsed = 0;// 已使用空间，
+        this._stashSize = this._stashInitialSize;//  真实大小
+        this._bufferSize = 1024 * 1024 * 3;  // initial size: 3MB// 缓冲区大小
+        this._stashBuffer = new ArrayBuffer(this._bufferSize);//暂存区的缓冲大小
         this._stashByteStart = 0;
-        this._enableStash = true;
+        this._enableStash = true; //是否开启暂存
         if (config.enableStashBuffer === false) {
             this._enableStash = false;
         }
 
-        this._loader = null;
+        this._loader = null;//真正的loader
         this._loaderClass = null;
         this._seekHandler = null;
 
@@ -75,8 +75,9 @@ class IOController {
         this._currentRange = null;
         this._redirectedURL = null;
 
-        this._speedNormalized = 0;
-        this._speedSampler = new SpeedSampler();
+        this._speedNormalized = 0;// 所属范围的常规速率
+        this._speedSampler = new SpeedSampler();//下载速度采样记录器
+        // 常规速率定义，暂存区的大小旧时根据这个来调节
         this._speedNormalizeList = [64, 128, 256, 384, 512, 768, 1024, 1536, 2048, 3072, 4096];
 
         this._isEarlyEofReconnecting = false;
@@ -91,8 +92,11 @@ class IOController {
         this._onRedirect = null;
         this._onRecoveredEarlyEof = null;
 
+        // 快进处理handler， 没看懂怎么使用
         this._selectSeekHandler();
+        //选择io加载器，确定_loaderClass，进行网络下载
         this._selectLoader();
+        // 根据_loaderClass进行实例化，并绑定事件监听
         this._createLoader();
     }
 
@@ -205,6 +209,7 @@ class IOController {
 
     // in KB/s
     get currentSpeed() {
+        // 如果是range方式，则从loader中获取，否则从_speedSampler中获取
         if (this._loaderClass === RangeLoader) {
             // SpeedSampler is inaccuracy if loader is RangeLoader
             return this._loader.currentSpeed;
@@ -238,10 +243,13 @@ class IOController {
 
     _selectLoader() {
         if (this._config.customLoader != null) {
+            // 自定义方式，便于扩展
             this._loaderClass = this._config.customLoader;
         } else if (this._isWebSocketURL) {
+            //判断url是不是ws协议， websocket方式
             this._loaderClass = WebSocketLoader;
         } else if (FetchStreamLoader.isSupported()) {
+            // 常用的http方式加载
             this._loaderClass = FetchStreamLoader;
         } else if (MozChunkedLoader.isSupported()) {
             this._loaderClass = MozChunkedLoader;
@@ -257,14 +265,20 @@ class IOController {
         if (this._loader.needStashBuffer === false) {
             this._enableStash = false;
         }
+        // 知道总长度，点播模式下有值，直播模式下没有
         this._loader.onContentLengthKnown = this._onContentLengthKnown.bind(this);
+        // 下载地址便了
         this._loader.onURLRedirect = this._onURLRedirect.bind(this);
+        // 收到数据
         this._loader.onDataArrival = this._onLoaderChunkArrival.bind(this);
+        // 下载完成
         this._loader.onComplete = this._onLoaderComplete.bind(this);
+        // 下载出问题
         this._loader.onError = this._onLoaderError.bind(this);
     }
 
     open(optionalFrom) {
+        // 从什么位置开始下载，-1说明一直下载
         this._currentRange = {from: 0, to: -1};
         if (optionalFrom) {
             this._currentRange.from = optionalFrom;
@@ -359,14 +373,15 @@ class IOController {
         // TODO: replace with new url
     }
 
+    // 扩容buffer，缓冲区不够用时
     _expandBuffer(expectedBytes) {
-        let bufferNewSize = this._stashSize;
+        let bufferNewSize = this._stashSize;//存储的大小
         while (bufferNewSize + 1024 * 1024 * 1 < expectedBytes) {
             bufferNewSize *= 2;
         }
 
         bufferNewSize += 1024 * 1024 * 1;  // bufferSize = stashSize + 1MB
-        if (bufferNewSize === this._bufferSize) {
+        if (bufferNewSize === this._bufferSize) {//buffer大小
             return;
         }
 
@@ -389,12 +404,14 @@ class IOController {
         let lbound = 0;
         let ubound = last;
 
+        // 最低的速率值
         if (input < list[0]) {
             return list[0];
         }
 
         // binary search
         while (lbound <= ubound) {
+            // 2分法查找
             mid = lbound + Math.floor((ubound - lbound) / 2);
             if (mid === last || (input >= list[mid] && input < list[mid + 1])) {
                 return list[mid];
@@ -428,6 +445,7 @@ class IOController {
 
         let bufferSize = stashSizeKB * 1024 + 1024 * 1024 * 1;  // stashSize + 1MB
         if (this._bufferSize < bufferSize) {
+            // 如果小了，先扩容
             this._expandBuffer(bufferSize);
         }
         this._stashSize = stashSizeKB * 1024;
@@ -467,34 +485,46 @@ class IOController {
             }
         }
 
+        // 累加收到的数量
         this._speedSampler.addBytes(chunk.byteLength);
 
+        // 计算出下载的速度
         // adjust stash buffer size according to network speed dynamically
         let KBps = this._speedSampler.lastSecondKBps;
         if (KBps !== 0) {
+            // 根据速率查找属于的参照标准速率
             let normalized = this._normalizeSpeed(KBps);
             if (this._speedNormalized !== normalized) {
                 this._speedNormalized = normalized;
+                // 如果所属的速率标准变了，重新分配暂存区大小。
                 this._adjustStashSize(normalized);
             }
         }
 
         if (!this._enableStash) {  // disable stash
+            // 【1】暂存区不可用的情况
             if (this._stashUsed === 0) {
+                //【1.1】 暂存区没数据，直接转发数据
                 // dispatch chunk directly to consumer;
                 // check ret value (consumed bytes) and stash unconsumed to stashBuffer
                 let consumed = this._dispatchChunks(chunk, byteStart);
+                //【1.1.1】数据没消耗/使用完，加入“暂存区”
                 if (consumed < chunk.byteLength) {  // unconsumed data remain.
+                    // 保留（remain）没使用完的数据
                     let remain = chunk.byteLength - consumed;
                     if (remain > this._bufferSize) {
+                        // 装不下，分配空间
                         this._expandBuffer(remain);
                     }
+                    // 加入暂存区，但不切换模式，stash只是用来存放使用不完的数据
                     let stashArray = new Uint8Array(this._stashBuffer, 0, this._bufferSize);
+                    // 从consumed开始开存放
                     stashArray.set(new Uint8Array(chunk, consumed), 0);
-                    this._stashUsed += remain;
-                    this._stashByteStart = byteStart + consumed;
+                    this._stashUsed += remain;// 有效数据
+                    this._stashByteStart = byteStart + consumed;// 写入的下标计算
                 }
             } else {
+                // 【1.2】暂存区由数据，先合并再转发
                 // else: Merge chunk into stashBuffer, and dispatch stashBuffer to consumer.
                 if (this._stashUsed + chunk.byteLength > this._bufferSize) {
                     this._expandBuffer(this._stashUsed + chunk.byteLength);
@@ -503,6 +533,7 @@ class IOController {
                 stashArray.set(new Uint8Array(chunk), this._stashUsed);
                 this._stashUsed += chunk.byteLength;
                 let consumed = this._dispatchChunks(this._stashBuffer.slice(0, this._stashUsed), this._stashByteStart);
+                //【1.2.1】数据没消耗/使用完，加入“暂存区”
                 if (consumed < this._stashUsed && consumed > 0) {  // unconsumed data remain
                     let remainArray = new Uint8Array(this._stashBuffer, consumed);
                     stashArray.set(remainArray, 0);
@@ -511,16 +542,20 @@ class IOController {
                 this._stashByteStart += consumed;
             }
         } else {  // enable stash
+            // 【2】 暂存区可用的情况
             if (this._stashUsed === 0 && this._stashByteStart === 0) {  // seeked? or init chunk?
                 // This is the first chunk after seek action
                 this._stashByteStart = byteStart;
             }
+
             if (this._stashUsed + chunk.byteLength <= this._stashSize) {
+                //【2.1】缓冲区没满（溢出）。直接加入缓冲区
                 // just stash
                 let stashArray = new Uint8Array(this._stashBuffer, 0, this._stashSize);
                 stashArray.set(new Uint8Array(chunk), this._stashUsed);
                 this._stashUsed += chunk.byteLength;
             } else {  // stashUsed + chunkSize > stashSize, size limit exceeded
+                //【2.2】缓冲区满了，开始转发数据
                 let stashArray = new Uint8Array(this._stashBuffer, 0, this._bufferSize);
                 if (this._stashUsed > 0) {  // There're stash datas in buffer
                     // dispatch the whole stashBuffer, and stash remain data
@@ -563,16 +598,21 @@ class IOController {
     }
 
     _flushStashBuffer(dropUnconsumed) {
+        // 处理剩余的暂存区数据
+        // 先转发一次，如果还有剩余的，再根据dropUnconsumed决定是否丢掉
         if (this._stashUsed > 0) {
             let buffer = this._stashBuffer.slice(0, this._stashUsed);
+            // 先转发出去
             let consumed = this._dispatchChunks(buffer, this._stashByteStart);
             let remain = buffer.byteLength - consumed;
 
             if (consumed < buffer.byteLength) {
                 if (dropUnconsumed) {
+                    // 1 如果还有数据，就丢弃掉
                     Log.w(this.TAG, `${remain} bytes unconsumed data remain when flush buffer, dropped`);
                 } else {
                     if (consumed > 0) {
+                        //2 继续留到
                         let stashArray = new Uint8Array(this._stashBuffer, 0, this._bufferSize);
                         let remainArray = new Uint8Array(buffer, consumed);
                         stashArray.set(remainArray, 0);
@@ -591,6 +631,7 @@ class IOController {
 
     _onLoaderComplete(from, to) {
         // Force-flush stash buffer, and drop unconsumed data
+
         this._flushStashBuffer(true);
 
         if (this._onComplete) {

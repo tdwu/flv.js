@@ -110,6 +110,7 @@ class WebSocketLoader extends BaseLoader {
             };
             reader.readAsArrayBuffer(e.data);
         } else {
+            // 不支持ws string的message模式
             this._status = LoaderStatus.kError;
             let info = {code: -1, msg: 'Unsupported WebSocket message type: ' + e.data.constructor.name};
 
