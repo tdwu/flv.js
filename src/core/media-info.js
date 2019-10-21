@@ -51,31 +51,34 @@ class MediaInfo {
 
     isComplete() {
         let audioInfoComplete = (this.hasAudio === false) ||
-                                (this.hasAudio === true &&
-                                 this.audioCodec != null &&
-                                 this.audioSampleRate != null &&
-                                 this.audioChannelCount != null);
+            (this.hasAudio === true &&
+                this.audioCodec != null &&
+                this.audioSampleRate != null &&
+                this.audioChannelCount != null);
 
         let videoInfoComplete = (this.hasVideo === false) ||
-                                (this.hasVideo === true &&
-                                 this.videoCodec != null &&
-                                 this.width != null &&
-                                 this.height != null &&
-                                 this.fps != null &&
-                                 this.profile != null &&
-                                 this.level != null &&
-                                 this.refFrames != null &&
-                                 this.chromaFormat != null &&
-                                 this.sarNum != null &&
-                                 this.sarDen != null);
+            (this.hasVideo === true &&
+                this.videoCodec != null &&
+                this.width != null &&
+                this.height != null &&
+                this.fps != null &&
+                this.profile != null &&
+                this.level != null &&
+                this.refFrames != null &&
+                this.chromaFormat != null &&
+                this.sarNum != null &&
+                this.sarDen != null);
 
         // keyframesIndex may not be present
+        /*
         return this.mimeType != null &&
                this.duration != null &&
                this.metadata != null &&
                this.hasKeyframesIndex != null &&
                audioInfoComplete &&
                videoInfoComplete;
+               */
+        return videoInfoComplete;
     }
 
     isSeekable() {

@@ -70,12 +70,13 @@ class FLVDemuxer {
         this._audioInitialMetadataDispatched = false;
         this._videoInitialMetadataDispatched = false;
 
+        // 媒体信息
         this._mediaInfo = new MediaInfo();
         this._mediaInfo.hasAudio = this._hasAudio;
         this._mediaInfo.hasVideo = this._hasVideo;
-        this._metadata = null;
-        this._audioMetadata = null;
-        this._videoMetadata = null;
+        this._metadata = null;// 由flv的script填充
+        this._audioMetadata = null;// 音频元数据
+        this._videoMetadata = null;// 视频元数据
 
         this._naluLengthSize = 4;
         this._timestampBase = 0;  // int32, in milliseconds
@@ -104,6 +105,7 @@ class FLVDemuxer {
         this._mpegAudioL2BitRateTable = [0, 32, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, -1];
         this._mpegAudioL3BitRateTable = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, -1];
 
+        // 视频（h264）数据处理后，就存放在这个地方
         this._videoTrack = {type: 'video', id: 1, sequenceNumber: 0, samples: [], length: 0};
         this._audioTrack = {type: 'audio', id: 2, sequenceNumber: 0, samples: [], length: 0};
 
@@ -233,6 +235,7 @@ class FLVDemuxer {
     }
 
     set timestampBase(base) {
+        console.log('设置_timestampBase：' + base);
         this._timestampBase = base;
     }
 
@@ -377,6 +380,7 @@ class FLVDemuxer {
             offset += 11 + dataSize + 4;  // tagBody + dataSize + prevTagSize
         }
 
+        // 处理完后，通知外部（mp4复合器），可以处理数据了
         // dispatch parsed frames to consumer (typically, the remuxer)
         if (this._isInitialMetadataDispatched()) {
             if (this._dispatch && (this._audioTrack.length || this._videoTrack.length)) {
@@ -930,13 +934,18 @@ class FLVDemuxer {
         let le = this._littleEndian;
         let v = new DataView(arrayBuffer, dataOffset, dataSize);
 
+        // 获取AVCPacketType
         let packetType = v.getUint8(0);
+        //获取CompostionTime（相对时间戳），只取3位
         let cts_unsigned = v.getUint32(0, !le) & 0x00FFFFFF;
         let cts = (cts_unsigned << 8) >> 8;  // convert to 24-bit signed int
 
-        if (packetType === 0) {  // AVCDecoderConfigurationRecord
+        if (packetType === 0) {
+            // AVCDecoderConfigurationRecord
+            // 配置等信息
             this._parseAVCDecoderConfigurationRecord(arrayBuffer, dataOffset + 4, dataSize - 4);
-        } else if (packetType === 1) {  // One or more Nalus
+        } else if (packetType === 1) {
+            // One or more Nalus
             this._parseAVCVideoData(arrayBuffer, dataOffset + 4, dataSize - 4, tagTimestamp, tagPosition, frameType, cts);
         } else if (packetType === 2) {
             // empty, AVC end of sequence
@@ -952,6 +961,9 @@ class FLVDemuxer {
             return;
         }
 
+
+        console.log('AVCDecoderConfigurationRecord');
+        // 视频元数据
         let meta = this._videoMetadata;
         let track = this._videoTrack;
         let le = this._littleEndian;
@@ -963,6 +975,7 @@ class FLVDemuxer {
                 this._mediaInfo.hasVideo = true;
             }
 
+            // 如果不存在，则先创建
             meta = this._videoMetadata = {};
             meta.type = 'video';
             meta.id = track.id;
@@ -974,6 +987,8 @@ class FLVDemuxer {
             }
         }
 
+        // 格式如下：
+        //| cfgVersion(8) | avcProfile(8) | profileCompatibility(8) |avcLevel(8) | reserved(6) | lengthSizeMinusOne(2) | reserved(3) | numOfSPS(5) |spsLength(16) | sps(n) | numOfPPS(8) | ppsLength(16) | pps(n) |
         let version = v.getUint8(0);  // configurationVersion
         let avcProfile = v.getUint8(1);  // avcProfileIndication
         let profileCompatibility = v.getUint8(2);  // profile_compatibility
@@ -984,12 +999,14 @@ class FLVDemuxer {
             return;
         }
 
+        // nalu header size？
         this._naluLengthSize = (v.getUint8(4) & 3) + 1;  // lengthSizeMinusOne
         if (this._naluLengthSize !== 3 && this._naluLengthSize !== 4) {  // holy shit!!!
             this._onError(DemuxErrors.FORMAT_ERROR, `Flv: Strange NaluLengthSizeMinusOne: ${this._naluLengthSize - 1}`);
             return;
         }
 
+        //【1】 sps处理
         let spsCount = v.getUint8(5) & 31;  // numOfSequenceParameterSets
         if (spsCount === 0) {
             this._onError(DemuxErrors.FORMAT_ERROR, 'Flv: Invalid AVCDecoderConfigurationRecord: No SPS');
@@ -1000,6 +1017,7 @@ class FLVDemuxer {
 
         let offset = 6;
 
+        // 从sps中提取信息
         for (let i = 0; i < spsCount; i++) {
             let len = v.getUint16(offset, !le);  // sequenceParameterSetLength
             offset += 2;
@@ -1012,6 +1030,7 @@ class FLVDemuxer {
             let sps = new Uint8Array(arrayBuffer, dataOffset + offset, len);
             offset += len;
 
+            // 提取出sps信息
             let config = SPSParser.parseSPS(sps);
             if (i !== 0) {
                 // ignore other sps's config
@@ -1051,6 +1070,7 @@ class FLVDemuxer {
             }
             meta.codec = codecString;
 
+            // 媒体信息
             let mi = this._mediaInfo;
             mi.width = meta.codecWidth;
             mi.height = meta.codecHeight;
@@ -1063,6 +1083,10 @@ class FLVDemuxer {
             mi.sarDen = meta.sarRatio.height;
             mi.videoCodec = codecString;
 
+            console.log('mediaInfo');
+            console.log(mi);
+            console.log('videoMediaData');
+            console.log(meta);
             if (mi.hasAudio) {
                 if (mi.audioCodec != null) {
                     mi.mimeType = 'video/x-flv; codecs="' + mi.videoCodec + ',' + mi.audioCodec + '"';
@@ -1071,10 +1095,13 @@ class FLVDemuxer {
                 mi.mimeType = 'video/x-flv; codecs="' + mi.videoCodec + '"';
             }
             if (mi.isComplete()) {
+                console.log('mediaInfo 加载完成');
                 this._onMediaInfo(mi);
             }
         }
 
+
+        //【1】 pps处理
         let ppsCount = v.getUint8(offset);  // numOfPictureParameterSets
         if (ppsCount === 0) {
             this._onError(DemuxErrors.FORMAT_ERROR, 'Flv: Invalid AVCDecoderConfigurationRecord: No PPS');
@@ -1121,7 +1148,10 @@ class FLVDemuxer {
         let units = [], length = 0;
 
         let offset = 0;
+        // 协议中nalv 长度，用几个直接存储传输
         const lengthSize = this._naluLengthSize;
+        //cts 相对时间
+        //tagTimestamp flv tag 中的时间
         let dts = this._timestampBase + tagTimestamp;
         let keyframe = (frameType === 1);  // from FLV Frame Type constants
 
@@ -1132,7 +1162,9 @@ class FLVDemuxer {
             }
             // Nalu with length-header (AVC1)
             let naluSize = v.getUint32(offset, !le);  // Big-Endian read
+            // console.log('naluSize:'+ naluSize);
             if (lengthSize === 3) {
+                // 如果是3个字节。只取3个直接
                 naluSize >>>= 8;
             }
             if (naluSize > dataSize - lengthSize) {
@@ -1146,9 +1178,10 @@ class FLVDemuxer {
                 keyframe = true;
             }
 
+            // 一帧数据，存入units中去(缓冲区，等待mp4符合器取出进行合并)
             let data = new Uint8Array(arrayBuffer, dataOffset + offset, lengthSize + naluSize);
-            let unit = {type: unitType, data: data};
-            units.push(unit);
+            // let unit = {type: unitType, data: data};
+            units.push({type: unitType, data: data});
             length += data.byteLength;
 
             offset += lengthSize + naluSize;
@@ -1160,15 +1193,32 @@ class FLVDemuxer {
                 units: units,
                 length: length,
                 isKeyframe: keyframe,
-                dts: dts,
-                cts: cts,
-                pts: (dts + cts)
+                dts: dts,// flv中的tag时间
+                cts: cts,// 相对时间
+                pts: (dts + cts)// 最终的player时间
             };
+            // console.log(dts + ' ' + cts + ' ' + (dts + cts));
+            // console.log(avcSample);
             if (keyframe) {
                 avcSample.fileposition = tagPosition;
             }
             track.samples.push(avcSample);
             track.length += length;
+
+            /**
+             *
+             *
+             * DTS和PTS的不同：
+
+             * DTS主要用于视频的解码,在解码阶段使用.
+
+             * PTS主要用于视频的同步和输出.在display的时候使用.
+
+             * 在没有B frame的情况下.DTS和PTS的输出顺序是一样的.（这点很重要）
+
+             * compositionTime = (PTS - DTS) / 90.0
+             *
+             * **/
         }
     }
 

@@ -275,8 +275,8 @@ class TransmuxingController {
             this._demuxer.onMetaDataArrived = this._onMetaDataArrived.bind(this);// 分离器获取到mediaInfo到达时
             this._demuxer.onScriptDataArrived = this._onScriptDataArrived.bind(this); // flv 脚本数据到达时
 
-            // 【重要】_remuxer（复合器（将音频和视频数据合并成ts数据））-->_demuxer（分离器，从flv分理出音频，视频数据）->_ioctl（flv数据提供下载）
-            // 绑定到_demuxer，由_demuxer来绑定_ioctl的onDataArrival，获取数据
+            // 【重要】_remuxer（复合器由_demuxer来绑定_ioctl的onDataArrival（将音频和视频数据合并成ts数据））-->_demuxer（分离器，从flv分理出音频，视频数据）->_ioctl（flv数据提供下载）
+            // 绑定到_demuxer，，获取数据
             this._demuxer.bindDataSource(this._ioctl);
             this._remuxer.bindDataSource(this._demuxer);
 

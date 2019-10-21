@@ -20,7 +20,7 @@ import Log from '../utils/logger.js';
 import MP4 from './mp4-generator.js';
 import AAC from './aac-silent.js';
 import Browser from '../utils/browser.js';
-import {SampleInfo, MediaSegmentInfo, MediaSegmentInfoList} from '../core/media-segment-info.js';
+import {MediaSegmentInfo, MediaSegmentInfoList, SampleInfo} from '../core/media-segment-info.js';
 import {IllegalStateException} from '../utils/exception.js';
 
 
@@ -54,8 +54,8 @@ class MP4Remuxer {
         // Workaround for chrome < 50: Always force first sample as a Random Access Point in media segment
         // see https://bugs.chromium.org/p/chromium/issues/detail?id=229412
         this._forceFirstIDR = (Browser.chrome &&
-                              (Browser.version.major < 50 ||
-                              (Browser.version.major === 50 && Browser.version.build < 2661))) ? true : false;
+            (Browser.version.major < 50 ||
+                (Browser.version.major === 50 && Browser.version.build < 2661))) ? true : false;
 
         // Workaround for IE11/Edge: Fill silent aac frame after keyframe-seeking
         // Make audio beginDts equals with video beginDts, in order to fix seek freeze
@@ -129,6 +129,7 @@ class MP4Remuxer {
         this._audioSegmentInfoList.clear();
     }
 
+    // 复合mp4 数据
     remux(audioTrack, videoTrack) {
         if (!this._onMediaSegment) {
             throw new IllegalStateException('MP4Remuxer: onMediaSegment callback must be specificed!');
@@ -380,14 +381,14 @@ class MP4Remuxer {
                 let currentDts = dts + refSampleDuration;  // Notice: in float
 
                 Log.w(this.TAG, 'Large audio timestamp gap detected, may cause AV sync to drift. ' +
-                                'Silent frames will be generated to avoid unsync.\n' +
-                                `dts: ${dts + sampleDuration} ms, expected: ${dts + Math.round(refSampleDuration)} ms, ` +
-                                `delta: ${Math.round(delta)} ms, generate: ${frameCount} frames`);
+                    'Silent frames will be generated to avoid unsync.\n' +
+                    `dts: ${dts + sampleDuration} ms, expected: ${dts + Math.round(refSampleDuration)} ms, ` +
+                    `delta: ${Math.round(delta)} ms, generate: ${frameCount} frames`);
 
                 let silentUnit = AAC.getSilentFrame(this._audioMeta.originalCodec, this._audioMeta.channelCount);
                 if (silentUnit == null) {
                     Log.w(this.TAG, 'Unable to generate silent frame for ' +
-                                    `${this._audioMeta.originalCodec} with ${this._audioMeta.channelCount} channels, repeat last frame`);
+                        `${this._audioMeta.originalCodec} with ${this._audioMeta.channelCount} channels, repeat last frame`);
                     // Repeat last frame
                     silentUnit = unit;
                 }
@@ -464,7 +465,7 @@ class MP4Remuxer {
             // size field
             mdatbox[0] = (mdatBytes >>> 24) & 0xFF;
             mdatbox[1] = (mdatBytes >>> 16) & 0xFF;
-            mdatbox[2] = (mdatBytes >>>  8) & 0xFF;
+            mdatbox[2] = (mdatBytes >>> 8) & 0xFF;
             mdatbox[3] = (mdatBytes) & 0xFF;
             // type field (fourCC)
             mdatbox.set(MP4.types.mdat, 4);
@@ -490,15 +491,15 @@ class MP4Remuxer {
         info.originalBeginDts = mp4Samples[0].originalDts;
         info.originalEndDts = latest.originalDts + latest.duration;
         info.firstSample = new SampleInfo(mp4Samples[0].dts,
-                                          mp4Samples[0].pts,
-                                          mp4Samples[0].duration,
-                                          mp4Samples[0].originalDts,
-                                          false);
+            mp4Samples[0].pts,
+            mp4Samples[0].duration,
+            mp4Samples[0].originalDts,
+            false);
         info.lastSample = new SampleInfo(latest.dts,
-                                         latest.pts,
-                                         latest.duration,
-                                         latest.originalDts,
-                                         false);
+            latest.pts,
+            latest.duration,
+            latest.originalDts,
+            false);
         if (!this._isLive) {
             this._audioSegmentInfoList.append(info);
         }
@@ -568,10 +569,12 @@ class MP4Remuxer {
             mdatBytes -= lastSample.length;
         }
 
+        // 上一次缓冲起，没初六完的数据
         // Insert [stashed lastSample in the previous batch] to the front
         if (this._videoStashedLastSample != null) {
             let sample = this._videoStashedLastSample;
             this._videoStashedLastSample = null;
+            // 向头部添加，继续处理
             samples.unshift(sample);
             mdatBytes += sample.length;
         }
@@ -586,6 +589,7 @@ class MP4Remuxer {
 
         // calculate dtsCorrection
         if (this._videoNextDts) {
+            // dts 修正
             dtsCorrection = firstSampleOriginalDts - this._videoNextDts;
         } else {  // this._videoNextDts == undefined
             if (this._videoSegmentInfoList.isEmpty()) {
@@ -667,7 +671,7 @@ class MP4Remuxer {
         mdatbox = new Uint8Array(mdatBytes);
         mdatbox[0] = (mdatBytes >>> 24) & 0xFF;
         mdatbox[1] = (mdatBytes >>> 16) & 0xFF;
-        mdatbox[2] = (mdatBytes >>>  8) & 0xFF;
+        mdatbox[2] = (mdatBytes >>> 8) & 0xFF;
         mdatbox[3] = (mdatBytes) & 0xFF;
         mdatbox.set(MP4.types.mdat, 4);
 
@@ -695,15 +699,15 @@ class MP4Remuxer {
         info.originalBeginDts = mp4Samples[0].originalDts;
         info.originalEndDts = latest.originalDts + latest.duration;
         info.firstSample = new SampleInfo(mp4Samples[0].dts,
-                                          mp4Samples[0].pts,
-                                          mp4Samples[0].duration,
-                                          mp4Samples[0].originalDts,
-                                          mp4Samples[0].isKeyframe);
+            mp4Samples[0].pts,
+            mp4Samples[0].duration,
+            mp4Samples[0].originalDts,
+            mp4Samples[0].isKeyframe);
         info.lastSample = new SampleInfo(latest.dts,
-                                         latest.pts,
-                                         latest.duration,
-                                         latest.originalDts,
-                                         latest.isKeyframe);
+            latest.pts,
+            latest.duration,
+            latest.originalDts,
+            latest.isKeyframe);
         if (!this._isLive) {
             this._videoSegmentInfoList.append(info);
         }
@@ -723,6 +727,8 @@ class MP4Remuxer {
         track.samples = [];
         track.length = 0;
 
+
+        // h264的数据转mpeg-ts4的数据
         this._onMediaSegment('video', {
             type: 'video',
             data: this._mergeBoxes(moofbox, mdatbox).buffer,
