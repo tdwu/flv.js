@@ -134,6 +134,7 @@ class MSEController {
                         sb.removeEventListener('error', this.e.onSourceBufferError);
                         sb.removeEventListener('updateend', this.e.onSourceBufferUpdateEnd);
                     }
+                    console.log(' 销毁了，detachMediaElement');
                     this._mimeTypes[type] = null;
                     this._sourceBuffers[type] = null;
                 }
