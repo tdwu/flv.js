@@ -62,6 +62,7 @@ class IOController {
         if (config.enableStashBuffer === false) {
             this._enableStash = false;
         }
+        this.lastByteStart = -1;
 
         this._loader = null;//真正的loader
         this._loaderClass = null;
@@ -479,6 +480,7 @@ class IOController {
 
     //byteStart 为chunk在整个流的开始index
     _onLoaderChunkArrival(chunk, byteStart, receivedLength) {
+        this.lastByteStart = byteStart;// 记录上一次位置，onComplete是判断使用
         if (!this._onDataArrival) {
             throw new IllegalStateException('IOController: No existing consumer (onDataArrival) callback!');
         }
@@ -642,8 +644,17 @@ class IOController {
 
         this._flushStashBuffer(true);
 
-        if (this._onComplete) {
-            this._onComplete(this._extraData);
+        if (this.lastByteStart >= 0) {
+            if (this._onComplete) {
+                this._onComplete(this._extraData);
+            }
+        } else {
+            if (this._onError) {
+                this._onError(LoaderErrors.CONNECTING_TIMEOUT, {
+                    code: 500,
+                    msg: '无信号'
+                });
+            }
         }
     }
 
