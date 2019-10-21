@@ -1193,8 +1193,8 @@ class FLVDemuxer {
                 units: units,
                 length: length,
                 isKeyframe: keyframe,
-                dts: dts,// flv中的tag时间
-                cts: cts,// 相对时间
+                dts: dts, // flv中的tag时间
+                cts: cts, // 相对时间
                 pts: (dts + cts)// 最终的player时间
             };
             // console.log(dts + ' ' + cts + ' ' + (dts + cts));

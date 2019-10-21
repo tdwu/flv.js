@@ -326,7 +326,7 @@ class TransmuxingController {
     }
 
     _onMetaDataArrived(metadata) {
-        console.log("_onMetaDataArrived");
+        console.log('_onMetaDataArrived');
         console.log(metadata);
         this._emitter.emit(TransmuxingEvents.METADATA_ARRIVED, metadata);
     }
