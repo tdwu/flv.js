@@ -29,8 +29,8 @@ export const defaultConfig = {
     deferLoadAfterSourceOpen: true,
 
     // autoCleanupSourceBuffer: default as false, leave unspecified
-    autoCleanupMaxBackwardDuration: 3 * 60,
-    autoCleanupMinBackwardDuration: 2 * 60,
+    autoCleanupMaxBackwardDuration: 3 * 5,
+    autoCleanupMinBackwardDuration: 2 * 5,
 
     statisticsInfoReportInterval: 600,
 

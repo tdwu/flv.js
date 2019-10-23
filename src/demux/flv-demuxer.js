@@ -392,9 +392,9 @@ class FLVDemuxer {
     }
 
     _parseScriptData(arrayBuffer, dataOffset, dataSize) {
+        console.log('_parseScriptData');
         let scriptData = AMF.parseScriptData(arrayBuffer, dataOffset, dataSize);
 
-        console.log('_parseScriptData');
         console.log(scriptData);
         if (scriptData.hasOwnProperty('onMetaData')) {
             if (scriptData.onMetaData == null || typeof scriptData.onMetaData !== 'object') {
@@ -1204,6 +1204,7 @@ class FLVDemuxer {
             }
             track.samples.push(avcSample);
             track.length += length;
+            //console.log(track.length);
 
             /**
              *

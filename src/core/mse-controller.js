@@ -56,14 +56,17 @@ class MSEController {
         this._pendingMediaDuration = 0;
 
         this._pendingSourceBufferInit = [];
+        // 格式
         this._mimeTypes = {
             video: null,
             audio: null
         };
+        // buffer
         this._sourceBuffers = {
             video: null,
             audio: null
         };
+        // 上一个初始化的segments
         this._lastInitSegments = {
             video: null,
             audio: null
@@ -111,6 +114,7 @@ class MSEController {
     }
 
     detachMediaElement() {
+        console.log(' 销毁了，detachMediaElement');
         if (this._mediaSource) {
             let ms = this._mediaSource;
             for (let type in this._sourceBuffers) {
@@ -134,7 +138,6 @@ class MSEController {
                         sb.removeEventListener('error', this.e.onSourceBufferError);
                         sb.removeEventListener('updateend', this.e.onSourceBufferUpdateEnd);
                     }
-                    console.log(' 销毁了，detachMediaElement');
                     this._mimeTypes[type] = null;
                     this._sourceBuffers[type] = null;
                 }
@@ -185,12 +188,14 @@ class MSEController {
         let firstInitSegment = false;
 
         Log.v(this.TAG, 'Received Initialization Segment, mimeType: ' + mimeType);
+        console.log(initSegment);
         this._lastInitSegments[is.type] = is;
 
         if (mimeType !== this._mimeTypes[is.type]) {
             if (!this._mimeTypes[is.type]) {  // empty, first chance create sourcebuffer
                 firstInitSegment = true;
                 try {
+                    // 绑定事件
                     let sb = this._sourceBuffers[is.type] = this._mediaSource.addSourceBuffer(mimeType);
                     sb.addEventListener('error', this.e.onSourceBufferError);
                     sb.addEventListener('updateend', this.e.onSourceBufferUpdateEnd);
@@ -206,6 +211,7 @@ class MSEController {
         }
 
         if (!deferred) {
+            //console.log('启用了_pendingSegments');
             // deferred means this InitSegment has been pushed to pendingSegments queue
             this._pendingSegments[is.type].push(is);
         }
@@ -227,6 +233,7 @@ class MSEController {
         let ms = mediaSegment;
         this._pendingSegments[ms.type].push(ms);
 
+        // 检查是否需要清除sourceBuffer中的历史数据
         if (this._config.autoCleanupSourceBuffer && this._needCleanupSourceBuffer()) {
             this._doCleanupSourceBuffer();
         }
@@ -238,6 +245,7 @@ class MSEController {
     }
 
     seek(seconds) {
+        console.log('mse seek');
         // remove all appended buffers
         for (let type in this._sourceBuffers) {
             if (!this._sourceBuffers[type]) {
@@ -498,7 +506,16 @@ class MSEController {
 
     _onSourceEnded() {
         // fired on endOfStream
+
+        console.log('MediaSource onSourceEnded,重新实例化一个');
         Log.v(this.TAG, 'MediaSource onSourceEnded');
+        let ms = this._mediaSource = new window.MediaSource();
+        ms.addEventListener('sourceopen', this.e.onSourceOpen);
+        ms.addEventListener('sourceended', this.e.onSourceEnded);
+        ms.addEventListener('sourceclose', this.e.onSourceClose);
+
+        this._mediaSourceObjectURL = window.URL.createObjectURL(this._mediaSource);
+        this._mediaElement.src = this._mediaSourceObjectURL;
     }
 
     _onSourceClose() {

@@ -123,6 +123,7 @@ class MP4Remuxer {
     }
 
     seek(originalDts) {
+        console.log('快进了');
         this._audioStashedLastSample = null;
         this._videoStashedLastSample = null;
         this._videoSegmentInfoList.clear();
@@ -144,6 +145,7 @@ class MP4Remuxer {
     _onTrackMetadataReceived(type, metadata) {
         let metabox = null;
 
+        console.log('_onTrackMetadataReceived');
         let container = 'mp4';
         let codec = metadata.codec;
 

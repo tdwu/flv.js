@@ -280,6 +280,7 @@ class TransmuxingController {
             this._demuxer.bindDataSource(this._ioctl);
             this._remuxer.bindDataSource(this._demuxer);
 
+            // 收到flv传递过来的metadata，处理后再暴露出来
             this._remuxer.onInitSegment = this._onRemuxerInitSegmentArrival.bind(this);
             this._remuxer.onMediaSegment = this._onRemuxerMediaSegmentArrival.bind(this);
 
