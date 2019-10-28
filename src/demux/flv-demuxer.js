@@ -42,6 +42,9 @@ function ReadBig32(array, index) {
         (array[index + 3]));
 }
 
+function buf2hex(buffer) { // buffer is an ArrayBuffer
+    return Array.prototype.map.call(new Uint8Array(buffer), x => ('00' + x.toString(16)).slice(-2)).join('  ');
+}
 
 class FLVDemuxer {
 
@@ -284,6 +287,10 @@ class FLVDemuxer {
     // 收到数据
     // function parseChunks(chunk: ArrayBuffer, byteStart: number): number;
     parseChunks(chunk, byteStart) {
+
+        //Log.w(this.TAG, 'dataLength:' + chunk.byteLength);
+        // console.log(buf2hex(chunk));
+
         // 对应IOController中的_dispatchChunks
         if (!this._onError || !this._onMediaInfo || !this._onTrackMetadata || !this._onDataAvailable) {
             throw new IllegalStateException('Flv: onError & onMediaInfo & onTrackMetadata & onDataAvailable callback must be specified');
@@ -344,14 +351,16 @@ class FLVDemuxer {
                 offset += 11 + dataSize + 4;
                 continue;
             }
-            let ts2 = v.getUint8(4);
-            let ts1 = v.getUint8(5);
-            let ts0 = v.getUint8(6);
-            let ts3 = v.getUint8(7);// TimestampExtended的字节
+            let ts2 = v.getUint8(4);//0 高位
+            let ts1 = v.getUint8(5);//1
+            let ts0 = v.getUint8(6);//2 地位
+            let ts3 = v.getUint8(7);// TimestampExtended的字节  高位
 
             // Timestamp 合并+TimestampExtended
             let timestamp = ts0 | (ts1 << 8) | (ts2 << 16) | (ts3 << 24);
 
+
+            // console.log("时间戳：" + timestamp);
             let streamId = v.getUint32(7, !le) & 0x00FFFFFF;//3个字节，所以取出4个，只看后面3个
             if (streamId !== 0) {
                 Log.w(this.TAG, 'Meet tag which has StreamID != 0!');
@@ -372,7 +381,10 @@ class FLVDemuxer {
                     break;
             }
 
+            //    console.log((11 + dataSize) + " " + chunk.byteLength);
             let prevTagSize = v.getUint32(11 + dataSize, !le);
+            //console.log('timestamp:' + timestamp + ' prevTagSize: ' + prevTagSize);
+
             if (prevTagSize !== 11 + dataSize) {
                 Log.w(this.TAG, `Invalid PrevTagSize ${prevTagSize}`);
             }
@@ -866,6 +878,7 @@ class FLVDemuxer {
         let frameType = (spec & 240) >>> 4;//数据类型，1为关键帧，2为非关键帧，3为h263的非关键帧，4为服务器生成关键帧，5为视频信息或命令帧。
         let codecId = spec & 15;// 包装类型，1为JPEG，2为H263，3为Screen video，4为On2 VP6，5为On2 VP6，6为Screen videoversion 2，7为AVC。
 
+        //console.log(frameType + ' ' + codecId);
         // 只支持h264
         if (codecId !== 7) {
             this._onError(DemuxErrors.CODEC_UNSUPPORTED, `Flv: Unsupported codec in video frame: ${codecId}`);
@@ -999,12 +1012,13 @@ class FLVDemuxer {
             return;
         }
 
-        // nalu header size？
+        // ？
         this._naluLengthSize = (v.getUint8(4) & 3) + 1;  // lengthSizeMinusOne
         if (this._naluLengthSize !== 3 && this._naluLengthSize !== 4) {  // holy shit!!!
             this._onError(DemuxErrors.FORMAT_ERROR, `Flv: Strange NaluLengthSizeMinusOne: ${this._naluLengthSize - 1}`);
             return;
         }
+
 
         //【1】 sps处理
         let spsCount = v.getUint8(5) & 31;  // numOfSequenceParameterSets
@@ -1082,11 +1096,6 @@ class FLVDemuxer {
             mi.sarNum = meta.sarRatio.width;
             mi.sarDen = meta.sarRatio.height;
             mi.videoCodec = codecString;
-
-            console.log('mediaInfo');
-            console.log(mi);
-            console.log('videoMediaData');
-            console.log(meta);
             if (mi.hasAudio) {
                 if (mi.audioCodec != null) {
                     mi.mimeType = 'video/x-flv; codecs="' + mi.videoCodec + ',' + mi.audioCodec + '"';
@@ -1128,6 +1137,7 @@ class FLVDemuxer {
         meta.avcc.set(new Uint8Array(arrayBuffer, dataOffset, dataSize), 0);
         Log.v(this.TAG, 'Parsed AVCDecoderConfigurationRecord');
 
+
         if (this._isInitialMetadataDispatched()) {
             // flush parsed frames
             if (this._dispatch && (this._audioTrack.length || this._videoTrack.length)) {
@@ -1139,6 +1149,10 @@ class FLVDemuxer {
         // notify new metadata
         this._dispatch = false;
         this._onTrackMetadata('video', meta);
+    }
+
+    buf2hex(buffer) { // buffer is an ArrayBuffer
+        return Array.prototype.map.call(new Uint8Array(buffer), x => ('00' + x.toString(16)).slice(-2)).join('');
     }
 
     _parseAVCVideoData(arrayBuffer, dataOffset, dataSize, tagTimestamp, tagPosition, frameType, cts) {
@@ -1155,6 +1169,7 @@ class FLVDemuxer {
         let dts = this._timestampBase + tagTimestamp;
         let keyframe = (frameType === 1);  // from FLV Frame Type constants
 
+
         while (offset < dataSize) {
             if (offset + 4 >= dataSize) {
                 Log.w(this.TAG, `Malformed Nalu near timestamp ${dts}, offset = ${offset}, dataSize = ${dataSize}`);
@@ -1167,6 +1182,10 @@ class FLVDemuxer {
                 // 如果是3个字节。只取3个直接
                 naluSize >>>= 8;
             }
+
+
+            //console.log(this.buf2hex(arrayBuffer.slice(dataOffset, dataSize)));
+
             if (naluSize > dataSize - lengthSize) {
                 Log.w(this.TAG, `Malformed Nalus near timestamp ${dts}, NaluSize > DataSize!`);
                 return;

@@ -21,6 +21,7 @@ import Log from '../utils/logger.js';
 import Browser from '../utils/browser.js';
 import MediaInfo from './media-info.js';
 import FLVDemuxer from '../demux/flv-demuxer.js';
+import H264Demuxer from '../demux/h264-demuxer.js';
 import MP4Remuxer from '../remux/mp4-remuxer.js';
 import DemuxErrors from '../demux/demux-errors.js';
 import IOController from '../io/io-controller.js';
@@ -241,7 +242,7 @@ class TransmuxingController {
         let consumed = 0;
 
         // 第一次收到数据时执行
-        console.log('第一次收到数据：' + data.byteLength + ' ' + byteStart);
+        console.log('第一次收到数据，长度：' + data.byteLength + ' 开始位置：' + byteStart);
         if (byteStart > 0) {
             // IOController seeked immediately after opened, byteStart > 0 callback may received
             this._demuxer.bindDataSource(this._ioctl);
@@ -252,6 +253,43 @@ class TransmuxingController {
             // Always create new FLVDemuxer
             // 创建flv分离器
             this._demuxer = new FLVDemuxer(probeData, this._config);
+
+            if (!this._remuxer) {
+                this._remuxer = new MP4Remuxer(this._config);
+            }
+
+            let mds = this._mediaDataSource;
+            if (mds.duration != undefined && !isNaN(mds.duration)) {
+                this._demuxer.overridedDuration = mds.duration;
+            }
+            if (typeof mds.hasAudio === 'boolean') {
+                this._demuxer.overridedHasAudio = mds.hasAudio;
+            }
+            if (typeof mds.hasVideo === 'boolean') {
+                this._demuxer.overridedHasVideo = mds.hasVideo;
+            }
+
+            this._demuxer.timestampBase = mds.segments[this._currentSegmentIndex].timestampBase;
+
+            this._demuxer.onError = this._onDemuxException.bind(this);// 分离异常绑定
+            this._demuxer.onMediaInfo = this._onMediaInfo.bind(this);// 分离器获取到media信息
+            this._demuxer.onMetaDataArrived = this._onMetaDataArrived.bind(this);// 分离器获取到mediaInfo到达时
+            this._demuxer.onScriptDataArrived = this._onScriptDataArrived.bind(this); // flv 脚本数据到达时
+
+            // 【重要】_remuxer（复合器由_demuxer来绑定_ioctl的onDataArrival（将音频和视频数据合并成ts数据））-->_demuxer（分离器，从flv分理出音频，视频数据）->_ioctl（flv数据提供下载）
+            // 绑定到_demuxer，，获取数据
+            this._demuxer.bindDataSource(this._ioctl);
+            this._remuxer.bindDataSource(this._demuxer);
+
+            // 收到flv传递过来的metadata，处理后再暴露出来
+            this._remuxer.onInitSegment = this._onRemuxerInitSegmentArrival.bind(this);
+            this._remuxer.onMediaSegment = this._onRemuxerMediaSegmentArrival.bind(this);
+
+            // 1 当前（第一个包），专递给分离器，2 后续的由分离器自己处理了
+            consumed = this._demuxer.parseChunks(data, byteStart);
+        } else if ((probeData = H264Demuxer.probe(data)).match) {// 是否h264格式的数据
+            // Always create new H264Demuxer
+            this._demuxer = new H264Demuxer(probeData, this._config);
 
             if (!this._remuxer) {
                 this._remuxer = new MP4Remuxer(this._config);

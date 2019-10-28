@@ -16,9 +16,12 @@
  * limitations under the License.
  */
 
-import Log from '../utils/logger.js';
-import {BaseLoader, LoaderStatus, LoaderErrors} from './loader.js';
+import {BaseLoader, LoaderErrors, LoaderStatus} from './loader.js';
 import {RuntimeException} from '../utils/exception.js';
+
+function buf2hex(buffer) { // buffer is an ArrayBuffer
+    return Array.prototype.map.call(new Uint8Array(buffer), x => ('00' + x.toString(16)).slice(-2)).join('  ');
+}
 
 // For FLV over WebSocket live stream
 class WebSocketLoader extends BaseLoader {
@@ -40,6 +43,7 @@ class WebSocketLoader extends BaseLoader {
         this._ws = null;
         this._requestAbort = false;
         this._receivedLength = 0;
+        this.url = null;
     }
 
     destroy() {
@@ -52,6 +56,7 @@ class WebSocketLoader extends BaseLoader {
     open(dataSource) {
         try {
             let ws = this._ws = new self.WebSocket(dataSource.url);
+            this.url = dataSource.url;
             ws.binaryType = 'arraybuffer';
             ws.onopen = this._onWebSocketOpen.bind(this);
             ws.onclose = this._onWebSocketClose.bind(this);
@@ -93,6 +98,7 @@ class WebSocketLoader extends BaseLoader {
             return;
         }
 
+        console.log('socket 关闭：' + this.url);
         this._status = LoaderStatus.kComplete;
 
         if (this._onComplete) {
@@ -105,6 +111,7 @@ class WebSocketLoader extends BaseLoader {
             this._dispatchArrayBuffer(e.data);
         } else if (e.data instanceof Blob) {
             let reader = new FileReader();
+            console.log('FileReader-------------------------');
             reader.onload = () => {
                 this._dispatchArrayBuffer(reader.result);
             };
@@ -127,12 +134,17 @@ class WebSocketLoader extends BaseLoader {
         let byteStart = this._receivedLength;
         this._receivedLength += chunk.byteLength;
 
+
         if (this._onDataArrival) {
             this._onDataArrival(chunk, byteStart, this._receivedLength);
         }
     }
 
     _onWebSocketError(e) {
+
+        console.log('socket 错误：' + this.url);
+        console.log(e);
+
         this._status = LoaderStatus.kError;
 
         let info = {
