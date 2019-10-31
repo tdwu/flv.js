@@ -477,6 +477,7 @@ class TransmuxingController {
             info.redirectedURL = this._ioctl.currentRedirectedURL;
         }
 
+        info.nalus=this._demuxer?this._demuxer._naluCount:0;
         info.speed = this._ioctl.currentSpeed;// 当前速度
         info.loaderType = this._ioctl.loaderType; // io loader 类
         info.currentSegmentIndex = this._currentSegmentIndex;

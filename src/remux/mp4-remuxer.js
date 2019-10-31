@@ -653,7 +653,7 @@ class MP4Remuxer {
             }
 
             //console.log('sampleDuration:' + sampleDuration + ',originalDts:' + originalDts + ',dts:' + dts + ',pts:' + pts + ' flv.dts:' + sample.dts + ',isKeyframe:' + isKeyframe + ',slength:' + sample.length + ',units:' + sample.units.length);
-            console.log('sampleDuration=' + sampleDuration + ',originalDts=' + originalDts + ',dts=' + dts + ',isKeyframe=' + isKeyframe + ',slength=' + sample.length + ',units=' + sample.units.length);
+            //console.log('sampleDuration=' + sampleDuration + ',originalDts=' + originalDts + ',dts=' + dts + ',isKeyframe=' + isKeyframe + ',slength=' + sample.length + ',units=' + sample.units.length);
             mp4Samples.push({
                 dts: dts,
                 pts: pts,

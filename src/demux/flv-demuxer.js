@@ -92,6 +92,7 @@ class FLVDemuxer {
             fps_num: 30000,
             fps_den: 1000
         };
+        this._naluCount=0;
 
         this._flvSoundRateTable = [5500, 11025, 22050, 44100, 48000];
 
@@ -1205,6 +1206,7 @@ class FLVDemuxer {
             // let unit = {type: unitType, data: data};
             units.push({type: unitType, data: data});
             length += data.byteLength;
+            this._naluCount++;
 
             offset += lengthSize + naluSize;
         }
