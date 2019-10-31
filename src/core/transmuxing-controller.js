@@ -243,7 +243,7 @@ class TransmuxingController {
         let consumed = 0;
 
         // 第一次收到数据时执行
-        console.log('第一次收到数据，长度：' + data.byteLength + ' 开始位置：' + byteStart);
+        // console.log('第一次收到数据，长度：' + data.byteLength + ' 开始位置：' + byteStart);
         if (byteStart > 0) {
             // IOController seeked immediately after opened, byteStart > 0 callback may received
             this._demuxer.bindDataSource(this._ioctl);
