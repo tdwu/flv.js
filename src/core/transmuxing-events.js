@@ -23,8 +23,8 @@ const TransmuxingEvents = {
     MEDIA_SEGMENT: 'media_segment',
     LOADING_COMPLETE: 'loading_complete',
     RECOVERED_EARLY_EOF: 'recovered_early_eof',
-    MEDIA_INFO: 'media_info',
-    METADATA_ARRIVED: 'metadata_arrived',
+    MEDIA_INFO: 'media_info',//由video和auduio scripte config触发提供
+    METADATA_ARRIVED: 'metadata_arrived',// 由flv的script onMetaData 触发提供
     SCRIPTDATA_ARRIVED: 'scriptdata_arrived',
     STATISTICS_INFO: 'statistics_info',
     RECOMMEND_SEEKPOINT: 'recommend_seekpoint'
