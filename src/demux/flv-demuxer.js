@@ -88,8 +88,8 @@ class FLVDemuxer {
         this._durationOverrided = false;
         this._referenceFrameRate = {
             fixed: true,
-            fps: 23.976,
-            fps_num: 23976,
+            fps: 30,
+            fps_num: 30000,
             fps_den: 1000
         };
 
@@ -238,7 +238,9 @@ class FLVDemuxer {
     }
 
     set timestampBase(base) {
-        console.log('设置_timestampBase：' + base);
+        if (base > 0) {
+            console.log('设置 flv _timestampBase：' + base);
+        }
         this._timestampBase = base;
     }
 
@@ -360,6 +362,7 @@ class FLVDemuxer {
             let timestamp = ts0 | (ts1 << 8) | (ts2 << 16) | (ts3 << 24);
 
 
+            //console.log('时间戳：' + timestamp);
             // console.log("时间戳：" + timestamp);
             let streamId = v.getUint32(7, !le) & 0x00FFFFFF;//3个字节，所以取出4个，只看后面3个
             if (streamId !== 0) {
@@ -974,8 +977,6 @@ class FLVDemuxer {
             return;
         }
 
-
-        console.log('AVCDecoderConfigurationRecord');
         // 视频元数据
         let meta = this._videoMetadata;
         let track = this._videoTrack;
@@ -1051,6 +1052,8 @@ class FLVDemuxer {
                 continue;
             }
 
+            //console.log('sps解析结果：');
+            //console.log(config);
             meta.codecWidth = config.codec_size.width;
             meta.codecHeight = config.codec_size.height;
             meta.presentWidth = config.present_size.width;
@@ -1104,7 +1107,7 @@ class FLVDemuxer {
                 mi.mimeType = 'video/x-flv; codecs="' + mi.videoCodec + '"';
             }
             if (mi.isComplete()) {
-                console.log('mediaInfo 加载完成');
+                // console.log('mediaInfo 加载完成');
                 this._onMediaInfo(mi);
             }
         }

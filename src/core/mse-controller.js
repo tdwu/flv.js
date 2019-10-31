@@ -188,7 +188,6 @@ class MSEController {
         let firstInitSegment = false;
 
         Log.v(this.TAG, 'Received Initialization Segment, mimeType: ' + mimeType);
-        console.log(initSegment);
         this._lastInitSegments[is.type] = is;
 
         if (mimeType !== this._mimeTypes[is.type]) {

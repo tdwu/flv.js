@@ -145,7 +145,7 @@ class MP4Remuxer {
     _onTrackMetadataReceived(type, metadata) {
         let metabox = null;
 
-        console.log('_onTrackMetadataReceived');
+        // console.log('_onTrackMetadataReceived');
         let container = 'mp4';
         let codec = metadata.codec;
 

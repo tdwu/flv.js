@@ -274,7 +274,7 @@ class IOController {
         }
         // 知道总长度，点播模式下有值，直播模式下没有
         this._loader.onContentLengthKnown = this._onContentLengthKnown.bind(this);
-        // 下载地址便了
+        // 下载地址变了
         this._loader.onURLRedirect = this._onURLRedirect.bind(this);
         // 收到数据
         this._loader.onDataArrival = this._onLoaderChunkArrival.bind(this);

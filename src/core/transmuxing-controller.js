@@ -38,7 +38,7 @@ class TransmuxingController {
 
         // treat single part media as multipart media, which has only one segment
         if (!mediaDataSource.segments) {
-            console.log('创建segments');
+            // console.log('创建segments');
             mediaDataSource.segments = [{
                 duration: mediaDataSource.duration,
                 filesize: mediaDataSource.filesize,
@@ -141,6 +141,7 @@ class TransmuxingController {
             // start时，这个没值。
             this._demuxer.bindDataSource(this._ioctl);
         } else {
+            // 当前收到数据后，由flv demuxer接管
             ioctl.onDataArrival = this._onInitChunkArrival.bind(this);
         }
 
@@ -476,12 +477,10 @@ class TransmuxingController {
             info.redirectedURL = this._ioctl.currentRedirectedURL;
         }
 
-        info.speed = this._ioctl.currentSpeed;
-        info.loaderType = this._ioctl.loaderType;
+        info.speed = this._ioctl.currentSpeed;// 当前速度
+        info.loaderType = this._ioctl.loaderType; // io loader 类
         info.currentSegmentIndex = this._currentSegmentIndex;
         info.totalSegmentCount = this._mediaDataSource.segments.length;
-        // console.log('状态汇报：');
-        // console.log(info);
         this._emitter.emit(TransmuxingEvents.STATISTICS_INFO, info);
     }
 

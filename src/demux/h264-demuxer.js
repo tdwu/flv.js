@@ -18,7 +18,6 @@
 
 import Log from '../utils/logger.js';
 import SPSParser from './sps-parser.js';
-import DemuxErrors from './demux-errors.js';
 import MediaInfo from '../core/media-info.js';
 import {IllegalStateException} from '../utils/exception.js';
 
@@ -205,7 +204,9 @@ class H264Demuxer {
     }
 
     set timestampBase(base) {
-        console.log('设置_timestampBase：' + base);
+        if (base > 0) {
+            console.log('设置 h264 _timestampBase：' + base);
+        }
         this._timestampBase = base;
     }
 
@@ -290,7 +291,7 @@ class H264Demuxer {
         let track = this._videoTrack;
         if (naluType == 7) {
             //sps
-            this._parseAVCSPSVideoData(arrayBuffer,offset);
+            this._parseAVCSPSVideoData(arrayBuffer, offset);
         } else if (naluType == 8) {
             //pps
 
