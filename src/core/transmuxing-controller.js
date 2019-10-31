@@ -58,7 +58,7 @@ class TransmuxingController {
         this._currentSegmentIndex = 0;
         let totalDuration = 0;
 
-        console.log(this._mediaDataSource);
+        // console.log(this._mediaDataSource);
         this._mediaDataSource.segments.forEach((segment) => {
             // timestampBase for each segment, and calculate total duration
             segment.timestampBase = totalDuration;
