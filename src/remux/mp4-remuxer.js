@@ -81,8 +81,10 @@ class MP4Remuxer {
     }
 
     bindDataSource(producer) {
-        producer.onDataAvailable = this.remux.bind(this);
+        // 当收到vudio或者audio的  meatadata时调用
         producer.onTrackMetadata = this._onTrackMetadataReceived.bind(this);
+        // 当收到video或者audio，tracker中有数据时调用
+        producer.onDataAvailable = this.remux.bind(this);
         return this;
     }
 
@@ -568,7 +570,7 @@ class MP4Remuxer {
         // Pop the lastSample and waiting for stash
         if (samples.length > 1) {
             lastSample = samples.pop();
-            mdatBytes -= lastSample.length;
+            mdatBytes -= lastSample.length;// 采样中的H264的长度
         }
 
         // 上一次缓冲起，没初六完的数据
@@ -650,6 +652,8 @@ class MP4Remuxer {
                 info.appendSyncPoint(syncPoint);
             }
 
+            //console.log('sampleDuration:' + sampleDuration + ',originalDts:' + originalDts + ',dts:' + dts + ',pts:' + pts + ' flv.dts:' + sample.dts + ',isKeyframe:' + isKeyframe + ',slength:' + sample.length + ',units:' + sample.units.length);
+            console.log('sampleDuration=' + sampleDuration + ',originalDts=' + originalDts + ',dts=' + dts + ',isKeyframe=' + isKeyframe + ',slength=' + sample.length + ',units=' + sample.units.length);
             mp4Samples.push({
                 dts: dts,
                 pts: pts,
@@ -671,6 +675,7 @@ class MP4Remuxer {
 
         // allocate mdatbox
         mdatbox = new Uint8Array(mdatBytes);
+        // 前面8字节，存放特殊数据（长度+MP4.types.mdat）
         mdatbox[0] = (mdatBytes >>> 24) & 0xFF;
         mdatbox[1] = (mdatBytes >>> 16) & 0xFF;
         mdatbox[2] = (mdatBytes >>> 8) & 0xFF;
@@ -730,7 +735,7 @@ class MP4Remuxer {
         track.length = 0;
 
 
-        // h264的数据转mpeg-ts4的数据
+        // h264的数据转fmp4的数据
         this._onMediaSegment('video', {
             type: 'video',
             data: this._mergeBoxes(moofbox, mdatbox).buffer,
