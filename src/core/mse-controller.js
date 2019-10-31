@@ -506,7 +506,6 @@ class MSEController {
     _onSourceEnded() {
         // fired on endOfStream
 
-        console.log('MediaSource onSourceEnded,重新实例化一个');
         Log.v(this.TAG, 'MediaSource onSourceEnded');
         let ms = this._mediaSource = new window.MediaSource();
         ms.addEventListener('sourceopen', this.e.onSourceOpen);
